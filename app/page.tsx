@@ -1,40 +1,62 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
-const APP_ID="1089"; const SYMBOL="R_75";
+import { useState, useEffect, useRef } from "react";
+const APP_ID="1089";
 export default function Page(){
-  const [token,setToken]=useState(""); const [bal,setBal]=useState(10000); const [rBal,setRBal]=useState(0);
-    const [mode,setMode]=useState<"demo"|"real">("demo"); const [tick,setTick]=useState(0);
-      const [stake,setStake]=useState(1); const [mult,setMult]=useState(200); const [logs,setLogs]=useState<string[]>(["Ready"]);
-        const [open,setOpen]=useState<any>(null); const wsRef=useRef<WebSocket|null>(null);
-          const log=(m:string)=>setLogs(l=>[`${new Date().toLocaleTimeString()} ${m}`,...l].slice(0,30));
-            useEffect(()=>{ const ws=new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`); ws.onopen=()=>ws.send(JSON.stringify({ticks:SYMBOL})); ws.onmessage=(e)=>{const d=JSON.parse(e.data); if(d.tick) setTick(d.tick.quote);}; const s=localStorage.getItem("deriv_token"); if(s) setToken(s); },[]);
-              const connectPat=async()=>{
-                  if(!token.startsWith("pat_")){ const ws=new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`); ws.onopen=()=>ws.send(JSON.stringify({authorize:token})); ws.onmessage=(e)=>{const d=JSON.parse(e.data); if(d.authorize){setRBal(d.authorize.balance); setBal(d.authorize.balance); setMode("real"); log(`REAL $${d.authorize.balance}`); ws.send(JSON.stringify({balance:1,subscribe:1})); ws.send(JSON.stringify({ticks:SYMBOL,subscribe:1}));} if(d.balance) setRBal(d.balance.balance); if(d.tick) setTick(d.tick.quote); if(d.error) log(d.error.message);}; wsRef.current=ws; return;}
-                      log("PAT - fetching accounts...");
-                          try{
-                                const r=await fetch("https://api.derivws.com/trading/v1/options/accounts",{headers:{"Authorization":`Bearer ${token}`,"Deriv-App-ID":APP_ID}});
-                                      const j=await r.json(); const accts=j.accounts||j.data||[]; const acc=accts.find((a:any)=>a.is_real)||accts[0]; if(!acc) throw new Error("No acct");
-                                            const id=acc.id||acc.account_id; log(`Acc ${id} Bal ${acc.balance}`); setRBal(acc.balance||0); setBal(acc.balance||0);
-                                                  const o=await fetch(`https://api.derivws.com/trading/v1/options/accounts/${id}/otp`,{method:"POST",headers:{"Authorization":`Bearer ${token}`,"Deriv-App-ID":APP_ID}});
-                                                        const oj=await o.json(); const url=oj.url||oj.websocket_url||oj.data?.url; if(!url) throw new Error(JSON.stringify(oj).slice(0,200));
-                                                              log("OTP OK - connecting WS...");
-                                                                    const ws=new WebSocket(url); ws.onopen=()=>{log("REAL CONNECTED!"); setMode("real"); ws.send(JSON.stringify({balance:1,subscribe:1}));};
-                                                                          ws.onmessage=(e)=>{const d=JSON.parse(e.data); if(d.balance) setRBal(d.balance.balance); if(d.proposal){ws.send(JSON.stringify({buy:d.proposal.id,price:d.proposal.ask_price})); log(`Buying ${d.proposal.id}`);} if(d.buy) log(`BOUGHT ${d.buy.contract_id}`); if(d.proposal_open_contract){if(d.proposal_open_contract.is_sold){log(`CLOSED $${d.proposal_open_contract.profit}`); setOpen(null);} else setOpen(d.proposal_open_contract);} if(d.error) log("ERR "+d.error.message);};
-                                                                                wsRef.current=ws; localStorage.setItem("deriv_token",token);
-                                                                                    }catch(e:any){log("Error "+e.message);}
-                                                                                      };
-                                                                                        const buy=(dir:string)=>{
-                                                                                            if(mode==="demo"){const entry=tick; setOpen({entry,dir,profit:0}); log(`DEMO ${dir} x${mult} $${stake}`); setTimeout(()=>{const p=Math.random()>0.45?stake*0.8:-stake; setBal(b=>b+p); log(`${p>0?"WIN":"LOSS"} $${p.toFixed(2)}`); setOpen(null);},4000);}
-                                                                                                else{const ws=wsRef.current; if(!ws) return; const ct=dir==="up"?"MULTUP":"MULTDOWN"; ws.send(JSON.stringify({proposal:1,amount:stake,basis:"stake",contract_type:ct,currency:"USD",multiplier:mult,symbol:SYMBOL})); log(`REAL ${ct} asking...`);}
-                                                                                                  };
-                                                                                                    return(<div style={{background:"#000",color:"#0f0",minHeight:"100vh",padding:14,fontFamily:"monospace"}}>
-                                                                                                        <h1>PROFITLANCE PAT+REAL {mode.toUpperCase()} {tick.toFixed(2)}</h1>
-                                                                                                            <h2>Bal ${mode==="real"?rBal.toFixed(2):bal.toFixed(2)}</h2>
-                                                                                                                {open&&<div style={{background:"#222",padding:8,marginTop:6,border:"1px solid #0f0"}}>{open.dir||open.contract_type} {open.entry?.toFixed(2)||""} P/L {open.profit?.toFixed(2)||"..."}</div>}
-                                                                                                                    <input value={token} onChange={e=>setToken(e.target.value)} placeholder="pat_ token" style={{width:"100%",marginTop:10,padding:10,background:"#111",color:"#0f0",border:"1px solid #333"}}/>
-                                                                                                                        <button onClick={connectPat} style={{width:"100%",marginTop:5,padding:12,background:"#0f0",color:"#000",fontWeight:"bold"}}>CONNECT REAL</button>
-                                                                                                                            <div style={{display:"flex",gap:8,marginTop:10}}><label>Stake <input type="number" value={stake} onChange={e=>setStake(Number(e.target.value))} style={{width:60,background:"#111",color:"#0f0"}}/></label><label>Mult <select value={mult} onChange={e=>setMult(Number(e.target.value))} style={{background:"#111",color:"#0f0"}}><option value={100}>100</option><option value={200}>200</option><option value={500}>500</option><option value={1000}>1000</option></select></label></div>
-                                                                                                                                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:12}}><button onClick={()=>buy("up")} style={{padding:16,background:"#0a0",color:"#fff",fontWeight:"bold"}}>BUY UP</button><button onClick={()=>buy("down")} style={{padding:16,background:"#a00",color:"#fff",fontWeight:"bold"}}>SELL DOWN</button></div>
-                                                                                                                                    <div style={{marginTop:12,maxHeight:300,overflow:"auto",fontSize:11}}>{logs.map((l,i)=><div key={i} style={{borderBottom:"1px solid #111",padding:"3px 0"}}>{l}</div>)}</div>
-                                                                                                                                      </div>);
-                                                                                                                                      }
+ const [token,setToken]=useState("");
+  const [bal,setBal]=useState(0);
+   const [log,setLog]=useState<string[]>([]);
+    const [price,setPrice]=useState(0);
+     const ws=useRef<WebSocket|null>(null);
+      const add=(m:string)=>setLog(p=>[m,...p].slice(0,80));
+       useEffect(()=>{
+         const w=new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${APP_ID}`);
+           ws.current=w;
+             w.onopen=()=>{add("WS OPEN"); w.send(JSON.stringify({ticks:"R_75"}))};
+               w.onmessage=(e)=>{
+                  const d=JSON.parse(e.data);
+                     if(d.tick) setPrice(d.tick.quote);
+                        if(d.authorize){ setBal(d.authorize.balance); add(`OK BAL $${d.authorize.balance} ${d.authorize.loginid}`) }
+                           if(d.buy) add(`BOUGHT ${d.buy.contract_id} $${d.buy.buy_price}`);
+                              if(d.error) add(`ERR ${d.error.code} ${d.error.message}`);
+                                };
+                                  return()=>w.close();
+                                   },[]);
+                                    const connect=()=>{
+                                      const t=token.trim(); if(!t) return;
+                                        add(`CONNECTING ${t.slice(0,8)}...`);
+                                          if(t.startsWith("pat_")){
+                                             fetch("https://api.deriv.com/api/account/info",{headers:{Authorization:`Bearer ${t}`}})
+                                                 .then(r=>r.json()).then(j=>{
+                                                      const b=j?.data?.balance ?? 0;
+                                                           if(b) setBal(b);
+                                                                add(`PAT REST BAL $${b}`);
+                                                                     ws.current?.send(JSON.stringify({authorize:t}));
+                                                                         }).catch(()=>{
+                                                                              add("PAT REST fail, trying WS auth directly");
+                                                                                   ws.current?.send(JSON.stringify({authorize:t}));
+                                                                                       });
+                                                                                         } else {
+                                                                                            ws.current?.send(JSON.stringify({authorize:t}));
+                                                                                              }
+                                                                                               };
+                                                                                                const buy=(dir:string)=>{
+                                                                                                  const type=dir==="up"?"CALL":"PUT";
+                                                                                                    ws.current?.send(JSON.stringify({buy:1,price:1,parameters:{amount:1,basis:"stake",contract_type:type,currency:"USD",duration:5,duration_unit:"t",symbol:"R_75"}}));
+                                                                                                      add(`BUY ${dir} ${type}`);
+                                                                                                       };
+                                                                                                        return (
+                                                                                                          <div style={{padding:12,background:"#000",color:"#0f0",minHeight:"100vh",fontFamily:"monospace"}}>
+                                                                                                             <h2 style={{color:"#0ff"}}>PROFITLANCE PAT+REAL R_75 {price}</h2>
+                                                                                                                <input value={token} onChange={e=>setToken(e.target.value)} placeholder="paste pat_ or a1- token full" style={{width:"100%",padding:10,background:"#111",color:"#0f0",border:"1px solid #0f0"}}/>
+                                                                                                                   <div style={{display:"flex",gap:8,marginTop:10}}>
+                                                                                                                       <button onClick={connect} style={{flex:1,padding:12,background:"#00aa00",color:"#fff",fontWeight:"bold"}}>CONNECT REAL</button>
+                                                                                                                           <div style={{padding:12,border:"1px solid #0f0"}}>BAL ${bal}</div>
+                                                                                                                              </div>
+                                                                                                                                 <div style={{display:"flex",gap:8,marginTop:12}}>
+                                                                                                                                     <button onClick={()=>buy("up")} style={{flex:1,padding:22,background:"green",color:"#fff",fontSize:20,fontWeight:"bold"}}>BUY UP x200</button>
+                                                                                                                                         <button onClick={()=>buy("down")} style={{flex:1,padding:22,background:"red",color:"#fff",fontSize:20,fontWeight:"bold"}}>SELL DOWN x200</button>
+                                                                                                                                            </div>
+                                                                                                                                               <div style={{marginTop:12,fontSize:12}}>{log.map((l,i)=><div key={i}>{l}</div>)}</div>
+                                                                                                                                                 </div>
+                                                                                                                                                  )
+                                                                                                                                                  }
