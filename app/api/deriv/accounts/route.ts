@@ -3,23 +3,30 @@ export const runtime = 'nodejs'
 
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization') || ''
+  const appId = process.env.DERIV_APP_ID || ''
+
   if (!auth) {
-    return new Response(JSON.stringify({ error: 'No auth' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+    return Response.json({ error: 'No Authorization header' }, { status: 401 })
   }
+  if (!appId) {
+    return Response.json({ error: 'Missing DERIV_APP_ID env var - add in Vercel Settings' }, { status: 500 })
+  }
+
   try {
-    const res = await fetch('https://api.deriv.com/api/v3/accounts', {
-      headers: { 'Authorization': auth, 'Accept': 'application/json' },
+    const res = await fetch('https://api.derivws.com/trading/v1/options/accounts', {
+      headers: {
+        'Authorization': auth,
+        'Deriv-App-ID': appId,
+        'Content-Type': 'application/json'
+      },
       cache: 'no-store'
     })
-    const body = await res.text()
-    // Always return JSON so frontend never gets "Unexpected end"
-    return new Response(JSON.stringify({
-      deriv_status: res.status,
-      deriv_ok: res.ok,
-      deriv_body_preview: body.substring(0, 2000),
-      token_preview: auth.substring(0, 15)
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    const text = await res.text()
+    return new Response(text, {
+      status: res.status,
+      headers: { 'Content-Type': 'application/json' }
+    })
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: 'fetch failed', message: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    return Response.json({ error: e.message }, { status: 500 })
   }
 }
