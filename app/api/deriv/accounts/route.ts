@@ -1,24 +1,25 @@
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET(req: Request) {
+  const auth = req.headers.get('authorization') || ''
+  if (!auth) {
+    return new Response(JSON.stringify({ error: 'No auth' }), { status: 401, headers: { 'Content-Type': 'application/json' } })
+  }
   try {
-    const auth = req.headers.get('authorization') || req.headers.get('Authorization')
-    if (!auth) {
-      return Response.json({ error: 'No Authorization header' }, { status: 401 })
-    }
     const res = await fetch('https://api.deriv.com/api/v3/accounts', {
-      headers: {
-        'Authorization': auth,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': auth, 'Accept': 'application/json' },
       cache: 'no-store'
     })
-    const text = await res.text()
-    try {
-      const json = JSON.parse(text)
-      return Response.json(json, { status: res.status })
-    } catch {
-      return Response.json({ error: 'Deriv raw', raw: text.substring(0, 500) }, { status: res.status })
-    }
+    const body = await res.text()
+    // Always return JSON so frontend never gets "Unexpected end"
+    return new Response(JSON.stringify({
+      deriv_status: res.status,
+      deriv_ok: res.ok,
+      deriv_body_preview: body.substring(0, 2000),
+      token_preview: auth.substring(0, 15)
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   } catch (e: any) {
-    return Response.json({ error: e.message }, { status: 500 })
+    return new Response(JSON.stringify({ error: 'fetch failed', message: e.message }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }
