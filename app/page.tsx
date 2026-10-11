@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
-const WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089";
+const WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1169";
+// 1169 = Deriv official PAT app_id, allows pat_ tokens
 
 export default function Page(){
   const [token,setToken]=useState("");
