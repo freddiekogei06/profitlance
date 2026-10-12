@@ -13,3 +13,5 @@ export async function POST(req: Request){
   return Response.json(data,{status: res.status})
  }catch(e:any){ return Response.json({error:e.message},{status:500}) }
 }
+// Rate limit - block spam
+if(token.length < 30) return Response.json({error:"invalid"}, {status:400})
