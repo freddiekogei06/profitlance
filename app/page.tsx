@@ -36,7 +36,7 @@ export default function Page(){
         body: JSON.stringify({token:t, accountId:accId})
       });
       const otpData=await r2.json();
-      add("OTP API: "+JSON.stringify(otpData).slice(0,300));
+      add(`OTP API - success`)
       if(!r2.ok){ add("❌ OTP failed: "+otpData.error); return; }
 
       const wsUrl=otpData.ws_url || otpData.url || otpData.otp_url;
