@@ -15,7 +15,7 @@ export default function Page(){
     if(t.length<60){ add("❌ Token too short, need full 68 chars with pat_"); return; }
     add("Step1: Getting accounts with Bearer "+t.slice(0,10)+"...");
     try{
-      const r=await fetch("/api/deriv/accounts",{
+      const r=await fetch("/api/accounts",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({token:t})
@@ -30,7 +30,7 @@ export default function Page(){
       add("Found account "+accId+" balance "+acc.balance);
 
       add("Step2: Getting OTP for "+accId+"...");
-      const r2=await fetch("/api/deriv/otp",{
+      const r2=await fetch("/api/otp",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body: JSON.stringify({token:t, accountId:accId})
